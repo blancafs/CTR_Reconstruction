@@ -1,0 +1,5 @@
+1. get all points from line fitting for both cams, aka fix saving of line fitting method
+2. solve bipartite graph problem to find least error correlation between points
+3. apply transf to matched pairs and measure 3d error
+4. 3d pruning + smoothing to fix error?
+5. improve line fitting ?
