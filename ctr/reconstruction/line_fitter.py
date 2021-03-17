@@ -275,13 +275,13 @@ class LineFitter:
 
                 # start at index 4 as before alg does not have time to be accurate
                 xs, ys = self.fitLine(images[i], i, cam, cont)
+                xs = np.array(xs).flatten()
+                ys = np.array(ys).flatten()
+                ys = np.array(ys)
+                zipped = list(map(list, zip(xs, ys)))
+                df = pd.DataFrame({'coors': zipped}, index=list(range(len(xs))), dtype=np.float32)
 
-                xs = xs.tolist()
-                ys = ys.tolist()
-
-                df = pd.DataFrame({'X': xs, 'Y': ys}, index=list(range(len(xs))))
-
-                filename = 'poly_points_cam'+ str(cam) + '_' + str(i) +".csv"
+                filename = 'poly_points_cam' + str(cam) + '_' + str(i) +".csv"
 
                 if len(save_folder) > 0:
                     save_path = os.path.join(save_folder, filename)
