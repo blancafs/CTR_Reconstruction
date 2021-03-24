@@ -1,3 +1,5 @@
+import collections
+
 import cv2
 import os
 import pandas as pd
@@ -8,6 +10,11 @@ import math
 from sklearn.linear_model import LinearRegression
 from sklearn.metrics import mean_squared_error, r2_score
 from sklearn.preprocessing import PolynomialFeatures
+from scipy.optimize import curve_fit
+from matplotlib import pyplot
+from scipy.interpolate import UnivariateSpline, interp1d, CubicSpline
+from scipy import interpolate
+
 
 # given contour shapes from backsubtract class, define polynomials going neatly through points in order
 # to better represent the robot and have a better shot at matching correspondance.
@@ -40,7 +47,7 @@ def concatContCoors(contours):
     finalys = []
 
     for c in contours:
-        cleancont = np.array(c).squeeze()
+        cleancont = c.squeeze()
         xs = [x[0] for x in cleancont]
         ys = [x[1] for x in cleancont]
         finalxs.append(xs)
@@ -123,54 +130,23 @@ def ransac(pts_x, pts_y, n_iter=10, dist_thresh=15):
     plt.show()
 
 
-def fitCurve(img, xs, ys):
-    # def func(x, a, b, c):
-    #     return a * np.square(x) + b * x + c
+def fitCurve(img, xs, ys, i, cam):
 
-    # Choose best polynomial accordint to error in curve fit
-    def findFunction(x, y, pmin=1, pmax=5):
-        # a * np.exp(-b * x) + c
+    def objective(x, a, b, c, d):
+        return a * x + b * x ** 2 + c * x**3 + d
 
-        def buildPoly(n):
+    popt, _ = curve_fit(objective, xs, ys)
+    a, b, c, d = popt
+    plt.scatter(xs, ys)
 
-            the_args = (n + 1) * []
+    x_line = np.arange(min(xs), max(xs), 1)
+    y_line = objective(x_line, a, b, c, d)
+    # plt.plot(x_line, y_line, '--', color='red')
+    # plt.title(str(cam) + '_' + str(i))
+    # plt.show()
+    print(x_line, y_line)
 
-            def poly(x, *args):
-                if len(args) < n + 1:
-                    print('Not enough args passed')
-                    return 0
-                res = 0
-                for i in range(n + 1):
-                    res += np.power(x, i) * args[-i]
-
-            return poly
-
-        errors = {}
-        popts = {}
-        for degree in range(pmin, pmax + 1):
-            current_func = buildPoly(degree)
-            popt, pcov = curve_fit(current_func, xs, ys)
-            err = np.sqrt(np.diag(pcov))
-            errors[degree] = err
-            popts[degree] = popt
-            print("Trying polynomial ", degree, ", error:", err, ", with parameters:", popt)
-            print(err)
-
-        # Error check and pick best N
-        bestError = min(errors, key=errors.get)
-        return popts[bestError], buildPoly(bestError)
-
-    plt.imshow(img)
-    plt.plot(xs, ys, 'b-', label='data')
-
-    popts, func = findFunction(xs, ys)
-
-    plt.plot(xs, func(xs, *popts), 'r-')
-
-    plt.xlabel('x')
-    plt.ylabel('y')
-    plt.legend()
-    plt.show()
+    return x_line, y_line
 
 
 def polyFitting(img_idx, cam, xs, ys, deg):
@@ -198,7 +174,7 @@ def polyFitting(img_idx, cam, xs, ys, deg):
     # with open(filename, 'a') as f:
     #     df.to_csv(f, header=f.tell() == 0, index=False)
 
-#    return the coordinates for the polynomial fit
+    #    return the coordinates for the polynomial fit
 
     # print('xpoly shape', xs.shape)
     # print('y_poly_pred shape', y_poly_pred.shape)
@@ -249,30 +225,30 @@ def create_polynomial_regression_model(degree, xs, ys):
 
 class LineFitter:
 
-    def __init__(self, method='polyreg'):
+    def __init__(self, method='scipy'):
         self.method = method
 
-    def fitLine(self, image, i, cam, conts):
+    def fitLine(self, image, i, cam, cont):
 
         if self.method == 'fitpoly':
-            contlines = fitPolyToContours(conts)
+            contlines = fitPolyToContours(cont)
             showFittedLine(image, i, contlines)
 
         if self.method == 'scipy':
-            [xs, ys] = concatContCoors(conts)
-            fitCurve(image, xs, ys)
+            [xs, ys] = concatContCoors(cont)
+            xs, ys = fitCurve(image, xs, ys, i, cam)
+            return xs, ys
 
         if self.method == 'polyreg':
-            [xs, ys] = concatContCoors(conts)
+            [xs, ys] = concatContCoors(cont)
             xs, ys = polyFitting(i, cam, xs, ys, 5)
             return xs, ys
-            # create_polynomial_regression_model(4, xs, ys)
 
-    def fitLines(self, images, cam, contours: dict, save_folder=""):
+    def fitLines(self, images: list, cam: int, contours: dict, save_folder=""):
         message = False
+
         for i, cont in contours.items():
             if i > 3:
-
                 # start at index 4 as before alg does not have time to be accurate
                 xs, ys = self.fitLine(images[i], i, cam, cont)
                 xs = np.array(xs).flatten()
@@ -281,13 +257,42 @@ class LineFitter:
                 zipped = list(map(list, zip(xs, ys)))
                 df = pd.DataFrame({'coors': zipped}, index=list(range(len(xs))), dtype=np.float32)
 
-                filename = 'poly_points_cam' + str(cam) + '_' + str(i) +".csv"
+                filename = 'scipy_curve_cam' + str(cam) + '_' + str(i) +".csv"
 
                 if len(save_folder) > 0:
                     save_path = os.path.join(save_folder, filename)
                     with open(save_path, 'a') as f:
                         df.to_csv(f, header=f.tell() == 0, index=False)
                     message = True
+
         return message
 
 # ===================================================================================================================================================================
+# zipped = list(zip(xs, ys))
+#     ordered_x = sorted(zipped, key=lambda x: x[0])
+#     final = []
+#     seen_xs = []
+#     for xy in ordered_x:
+#         x = xy[0]
+#         if x not in seen_xs:
+#             final.append(xy)
+#             seen_xs.append(x)
+#
+#     new_xs = np.array([x[0] for x in final])
+#     new_ys = np.array([x[1] for x in final])
+#
+#     # s determines how close to the data you have to go through
+#     # s = interpolate.splrep(xs, ys, s=3, method)
+#     cs = CubicSpline(new_xs, new_ys)
+#     x_line = np.arange(min(xs), max(xs), 1)
+#     y_line = cs(x_line)
+#     # print(x_line, y_line)
+#     spl = interpolate.splrep(new_xs, new_ys, s=5)
+#     y_in_line = interpolate.splev(x_line, spl)
+#
+#     plt.scatter(xs, ys, label='true data')
+#     plt.plot(x_line, y_in_line, color='black', label='interpolation')
+#     # plt.plot(x_line, y_line, '--', color='red', label='cubic spline')
+#     plt.title(str(cam) + '_' + str(i))
+#     plt.legend()
+#     plt.show()

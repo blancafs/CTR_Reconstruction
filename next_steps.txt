@@ -4,4 +4,4 @@
 4. 3d pruning + smoothing to fix error? plotly to visualise!
 5. improve line fitting ?
 
-Visualising problems: better tools? 
+Visualising problems: better tools?

@@ -22,6 +22,8 @@ if __name__ == '__main__':
     contours_cam1 = segmentor.segmentImgs(cam1imgs, backimg)
     contours_cam2 = segmentor.segmentImgs(cam2imgs, backimg)
 
+    good = [4, 5, 6, 7, 8, 13]
+
     # Fit polynomials to robot body in order to minimise points to transform, save to csvs
     # lf = LineFitter()
     # success_cam1 = lf.fitLines(cam1imgs, 1, contours_cam1, save_folder=LF_RESULTS_FOLDER)
@@ -36,27 +38,32 @@ if __name__ == '__main__':
     image_stereo_coors = {}
 
     for i, c1_name in enumerate(cam1_files):
-        for j, c2_name in enumerate(cam2_files):
-            if i == j:
-                coors1 = reader.read_poly_coors(dirname, c1_name)
-                coors2 = reader.read_poly_coors(dirname, c2_name)
-                image_coors = [coors1, coors2]
-                image_stereo_coors.update({i: image_coors})
+        if i+4 in good:
+            for j, c2_name in enumerate(cam2_files):
+                if i == j:
+                    coors1 = reader.read_poly_coors(dirname, c1_name)
+                    coors2 = reader.read_poly_coors(dirname, c2_name)
+                    image_coors = [coors1, coors2]
+                    n = i+4
+                    image_stereo_coors.update({n: image_coors})
+
 
     wg = WeightedGraph()
-    graph_matches = GRAPH_MATCHES
-    # print('Applying weighted graph...')
-    # # Apply weighted graph matching to sets of coordinates
-    # for idx in image_stereo_coors.keys():
-    #     print(idx/len(image_stereo_coors.keys()))
-    #     c1 = image_stereo_coors.get(idx)[0]
-    #     c2 = image_stereo_coors.get(idx)[1]
-    #     wg.set_pairs(c1, c2)
-    #     row_idx, col_idx = wg.solve()
-    #     matching = [row_idx, col_idx]
-    #     graph_matches.update({idx: matching})
-    #     wg.clear()
+    # graph_matches = GRAPH_MATCHES
+    graph_matches = {}
+    print('Applying weighted graph...')
+    # Apply weighted graph matching to sets of coordinates
+    for idx in image_stereo_coors.keys():
+        print(idx/len(image_stereo_coors.keys()))
+        c1 = image_stereo_coors.get(idx)[0]
+        c2 = image_stereo_coors.get(idx)[1]
+        wg.set_pairs(c1, c2)
+        row_idx, col_idx = wg.solve()
+        matching = [row_idx, col_idx]
+        graph_matches.update({idx: matching})
+        wg.clear()
 
+    print(graph_matches.items())
     robots = {}
     corresp_coors = []
     # [(x,y),(x',y')]
@@ -88,26 +95,22 @@ if __name__ == '__main__':
         plotly.io.write_image(fig, name)
         robots.update({key: final_robot})
 
-    # for rob in robots.keys():
-    #     # robots.keys():
-    #     r = robots.get(rob)
-    #     xs = [x[0] for x in r]
-    #     ys = [x[1] for x in r]
-    #     zs = [x[2] for x in r]
-    #     fig = plt.figure(figsize=(10, 10))
-    #     ax = plt.axes(projection='3d')
-    #     ax.plot3D(xs, ys, zs, 'gray')
-    #     ax.scatter3D(xs, ys, zs, c=zs, cmap='Greens');
-    #     num = rob + 4
-    #     name = 'frame_' + str(num) + '.png'
-    #     ax.set_title(name)
-    #     # Adjust plot view
-    #     ax.view_init(elev=50, azim=225)
-    #     ax.dist = 11
-    #     print('saving image...')
-    #     plt.savefig(name)
-    #     plt.show()
-    #     plt.clf()
+    for rob in robots.keys():
+        # robots.keys():
+        r = robots.get(rob)
+        xs = [x[0] for x in r]
+        ys = [x[1] for x in r]
+        zs = [x[2] for x in r]
+        print('showing figure...')
+        fig = plt.figure(figsize=(10, 10))
+        ax = plt.axes(projection='3d')
+        ax.plot3D(xs, ys, zs, 'gray')
+        ax.scatter3D(xs, ys, zs, c=zs, cmap='Greens');
+
+        num = rob + 4
+        name = 'frame_' + str(num) + '.png'
+        ax.set_title(name)
+        plt.show()
 
 
 

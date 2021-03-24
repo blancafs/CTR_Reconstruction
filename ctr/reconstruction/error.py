@@ -5,7 +5,7 @@ from ctr.resources import *
 
 
 def transform(corresp_coors):
-
+    print('transforming...')
     # where corresp_coors is in format: c1 [(x,y),(x',y')] c2
     x = BEST_TRANSF_X
     cam1 = [x[0] for x in corresp_coors]
@@ -56,14 +56,17 @@ def transform(corresp_coors):
         z = p[2]
         aug = p[3]
         if aug == 0:
+            print(p)
             print('dividing by 0...')
         newp = np.array([x / aug, y / aug, z / aug])
         final_points.append(newp)
 
+    print('final points after transform', final_points)
+
     return final_points
 
 
-def error_function(x, arg1, arg2, mode='mult'):
+def error_function(x, arg1, arg2, mode='single'):
     """
     Applies transformation to coordinates, reflects them back to find the error.
     Takes as argument:
@@ -120,10 +123,12 @@ def error_function(x, arg1, arg2, mode='mult'):
         z = p[2]
         aug = p[3]
         if aug == 0:
-            print('dividing by 0...')
-        newp = np.array([x / aug, y / aug, z / aug, 1])
-
-        threed_hom_points.append(newp)
+            # print('point', p,'c1', c1,'c2', c2, 'world_coor', world_coors)
+            # print('dividing by 0 in error_function...skipping coor')
+            pass
+        else:
+            newp = np.array([x / aug, y / aug, z / aug, 1])
+            threed_hom_points.append(newp)
 
     err_sum = 0
 
