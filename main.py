@@ -3,7 +3,9 @@ import plotly
 from ctr.reader.reader import Reader
 from ctr.resources import *
 from ctr.segmentation import BackgroundSubstraction
-from ctr.reconstruction import LineFitter, WeightedGraph, transform
+from ctr.reconstruction import LineFitter, WeightedGraph, transform, transform_many, show_robot_3d, join_corresp_coors
+import numpy as np
+from scipy.io import savemat
 
 import matplotlib.pyplot as plt
 import plotly.graph_objects as go
@@ -22,101 +24,40 @@ if __name__ == '__main__':
     contours_cam1 = segmentor.segmentImgs(cam1imgs, backimg)
     contours_cam2 = segmentor.segmentImgs(cam2imgs, backimg)
 
-    good = [4, 5, 6, 7, 8, 13]
-
     # Fit polynomials to robot body in order to minimise points to transform, save to csvs
-    # lf = LineFitter()
-    # success_cam1 = lf.fitLines(cam1imgs, 1, contours_cam1, save_folder=LF_RESULTS_FOLDER)
-    # success_cam2 = lf.fitLines(cam2imgs, 2, contours_cam2, save_folder=LF_RESULTS_FOLDER)
+    lf = LineFitter()
+    cam1_lf = lf.fitLines(cam1imgs, 1, contours_cam1, save_folder=LF_RESULTS_FOLDER)
+    cam2_lf = lf.fitLines(cam2imgs, 2, contours_cam2, save_folder=LF_RESULTS_FOLDER)
 
-    # Read csvs to retrieve poly points per image, pair by IMG_IDX = (CAM1COORS, CAM2COORS)
-    dirname = LF_RESULTS_FOLDER
-    poly_point_files = os.listdir(LF_RESULTS_FOLDER)
-    cam1_files = [filename for filename in poly_point_files if 'cam1' in filename]
-    cam2_files = [filename for filename in poly_point_files if 'cam2' in filename]
+    good_fits = [5, 6, 7, 8]
+    good_coor_sets = {}
 
-    image_stereo_coors = {}
-
-    for i, c1_name in enumerate(cam1_files):
-        if i+4 in good:
-            for j, c2_name in enumerate(cam2_files):
-                if i == j:
-                    coors1 = reader.read_poly_coors(dirname, c1_name)
-                    coors2 = reader.read_poly_coors(dirname, c2_name)
-                    image_coors = [coors1, coors2]
-                    n = i+4
-                    image_stereo_coors.update({n: image_coors})
-
+    for gf in good_fits:
+        corresp = [cam1_lf[gf],  cam2_lf[gf]]
+        good_coor_sets.update({gf : corresp})
 
     wg = WeightedGraph()
     # graph_matches = GRAPH_MATCHES
     graph_matches = {}
     print('Applying weighted graph...')
     # Apply weighted graph matching to sets of coordinates
-    for idx in image_stereo_coors.keys():
-        print(idx/len(image_stereo_coors.keys()))
-        c1 = image_stereo_coors.get(idx)[0]
-        c2 = image_stereo_coors.get(idx)[1]
+    for idx in good_coor_sets.keys():
+        c1 = good_coor_sets.get(idx)[0]
+        c2 = good_coor_sets.get(idx)[1]
         wg.set_pairs(c1, c2)
         row_idx, col_idx = wg.solve()
         matching = [row_idx, col_idx]
         graph_matches.update({idx: matching})
         wg.clear()
+        print((idx - 4) / len(good_coor_sets.keys()))
 
-    print(graph_matches.items())
-    robots = {}
-    corresp_coors = []
-    # [(x,y),(x',y')]
+    # print(graph_matches.items())
 
-    for key in graph_matches.keys():
-        c1_matches = graph_matches.get(key)[0]
-        c2_matches = graph_matches.get(key)[1]
+    # rerturns dict of idx : [c1coors, c2coors]
+    corresp_coors = join_corresp_coors(good_coor_sets, graph_matches)
 
-        for x in c1_matches:
-            for y in c2_matches:
-                # from image key, get camera1 and camera2 corresponding to a match as stated
-                c1_coor = image_stereo_coors.get(key)[0][x]
-                c2_coor = image_stereo_coors.get(key)[1][y]
-                corresp = [c1_coor, c2_coor]
-                corresp_coors.append(corresp)
-
-        print('Getting final robot for pose', key)
-        num = key + 4
-        name = 'frame_' + str(num) + '.png'
-        final_robot = transform(corresp_coors)
-
-        xs = [x[0] for x in final_robot]
-        ys = [x[1] for x in final_robot]
-        zs = [x[2] for x in final_robot]
-
-        fig = go.Figure(data=[go.Scatter3d(x=xs, y=ys, z=zs, mode='markers')])
-        # fig.show()
-        print('Saving image...')
-        plotly.io.write_image(fig, name)
-        robots.update({key: final_robot})
-
-    for rob in robots.keys():
-        # robots.keys():
-        r = robots.get(rob)
-        xs = [x[0] for x in r]
-        ys = [x[1] for x in r]
-        zs = [x[2] for x in r]
-        print('showing figure...')
-        fig = plt.figure(figsize=(10, 10))
-        ax = plt.axes(projection='3d')
-        ax.plot3D(xs, ys, zs, 'gray')
-        ax.scatter3D(xs, ys, zs, c=zs, cmap='Greens');
-
-        num = rob + 4
-        name = 'frame_' + str(num) + '.png'
-        ax.set_title(name)
-        plt.show()
-
-
-
-
-
-
+    robots = transform_many(corresp_coors)
+    show_robot_3d(robots)
 
 
 

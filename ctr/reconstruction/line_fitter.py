@@ -130,21 +130,21 @@ def ransac(pts_x, pts_y, n_iter=10, dist_thresh=15):
     plt.show()
 
 
-def fitCurve(img, xs, ys, i, cam):
+def fitCurve(img, xs, ys, i, cam, plot=False):
 
     def objective(x, a, b, c, d):
         return a * x + b * x ** 2 + c * x**3 + d
 
     popt, _ = curve_fit(objective, xs, ys)
     a, b, c, d = popt
-    plt.scatter(xs, ys)
 
     x_line = np.arange(min(xs), max(xs), 1)
     y_line = objective(x_line, a, b, c, d)
-    # plt.plot(x_line, y_line, '--', color='red')
-    # plt.title(str(cam) + '_' + str(i))
-    # plt.show()
-    print(x_line, y_line)
+    # if plot:
+    #     plt.scatter(xs, ys)
+    #     plt.plot(x_line, y_line, '--', color='red')
+    #     plt.title(str(cam) + '_' + str(i))
+    #     plt.show()
 
     return x_line, y_line
 
@@ -225,8 +225,9 @@ def create_polynomial_regression_model(degree, xs, ys):
 
 class LineFitter:
 
-    def __init__(self, method='scipy'):
+    def __init__(self, method='scipy', plot=False):
         self.method = method
+        self.plot = False
 
     def fitLine(self, image, i, cam, cont):
 
@@ -236,7 +237,7 @@ class LineFitter:
 
         if self.method == 'scipy':
             [xs, ys] = concatContCoors(cont)
-            xs, ys = fitCurve(image, xs, ys, i, cam)
+            xs, ys = fitCurve(image, xs, ys, i, cam, self.plot)
             return xs, ys
 
         if self.method == 'polyreg':
@@ -245,27 +246,34 @@ class LineFitter:
             return xs, ys
 
     def fitLines(self, images: list, cam: int, contours: dict, save_folder=""):
-        message = False
 
+        fitted_lines = {}
+        # idx : x,y...
         for i, cont in contours.items():
             if i > 3:
                 # start at index 4 as before alg does not have time to be accurate
                 xs, ys = self.fitLine(images[i], i, cam, cont)
                 xs = np.array(xs).flatten()
                 ys = np.array(ys).flatten()
-                ys = np.array(ys)
                 zipped = list(map(list, zip(xs, ys)))
-                df = pd.DataFrame({'coors': zipped}, index=list(range(len(xs))), dtype=np.float32)
+                fitted_lines.update({i: zipped})
 
-                filename = 'scipy_curve_cam' + str(cam) + '_' + str(i) +".csv"
+        return fitted_lines
 
-                if len(save_folder) > 0:
-                    save_path = os.path.join(save_folder, filename)
-                    with open(save_path, 'a') as f:
-                        df.to_csv(f, header=f.tell() == 0, index=False)
-                    message = True
 
-        return message
+
+
+
+
+
+
+
+
+
+
+
+
+
 
 # ===================================================================================================================================================================
 # zipped = list(zip(xs, ys))
@@ -296,3 +304,13 @@ class LineFitter:
 #     plt.title(str(cam) + '_' + str(i))
 #     plt.legend()
 #     plt.show()
+
+# df = pd.DataFrame({'coors': zipped}, index=list(range(len(xs))), dtype=np.float32)
+                #
+                # filename = 'scipy_curve_cam' + str(cam) + '_' + str(i) +".csv"
+
+                # if len(save_folder) > 0:
+                #     save_path = os.path.join(save_folder, filename)
+                #     with open(save_path, 'a') as f:
+                #         df.to_csv(f, header=f.tell() == 0, index=False)
+                #     message = True

@@ -3,9 +3,17 @@ import cv2
 
 from ctr.resources import *
 
+def transform_many(corresp_coors_dict):
+    # returns robot coordinate in (x,y,z) format
+    robots = {}
+    for i in corresp_coors_dict.keys():
+        coors = corresp_coors_dict.get(i)
+        print(coors)
+        real_points = transform(coors)
+        robots.update({i: real_points})
+    return robots
 
 def transform(corresp_coors):
-    print('transforming...')
     # where corresp_coors is in format: c1 [(x,y),(x',y')] c2
     x = BEST_TRANSF_X
     cam1 = [x[0] for x in corresp_coors]
@@ -50,7 +58,6 @@ def transform(corresp_coors):
     final_points = []
     # Makes 4d into 3d points
     for p in threed_non_hom_points:
-        p = np.array(p)
         x = p[0]
         y = p[1]
         z = p[2]
@@ -60,8 +67,6 @@ def transform(corresp_coors):
             print('dividing by 0...')
         newp = np.array([x / aug, y / aug, z / aug])
         final_points.append(newp)
-
-    print('final points after transform', final_points)
 
     return final_points
 
