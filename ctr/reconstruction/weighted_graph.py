@@ -34,7 +34,7 @@ class WeightedGraph(CtrClass):
         # Fill cost matrix by finding error between each pair
         for i, p1 in enumerate(left_img1):
             for j, p2 in enumerate(right_img2):
-                err = error_function(BEST_TRANSF_X, p1, p2, mode='single')
+                err, prj2 = error_function(BEST_TRANSF_X, p1, p2, mode='single')
                 cost_matrix[i, j] = err
 
         self.cost_matrix = cost_matrix

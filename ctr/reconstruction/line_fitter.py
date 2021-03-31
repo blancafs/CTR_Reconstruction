@@ -129,6 +129,9 @@ def ransac(pts_x, pts_y, n_iter=10, dist_thresh=15):
     plt.ioff()
     plt.show()
 
+def line_range(start, stop, count):
+    step = (stop - start) / float(count)
+    return np.array([start + i * step for i in range(count)])
 
 def fitCurve(img, xs, ys, i, cam, plot=False):
 
@@ -138,11 +141,12 @@ def fitCurve(img, xs, ys, i, cam, plot=False):
     popt, _ = curve_fit(objective, xs, ys)
     a, b, c, d = popt
 
-    x_line = np.arange(min(xs), max(xs), 1)
+    x_line = line_range(min(xs), max(xs), 500)
     y_line = objective(x_line, a, b, c, d)
     # if plot:
     #     plt.scatter(xs, ys)
     #     plt.plot(x_line, y_line, '--', color='red')
+    #     plt.imshow(img)
     #     plt.title(str(cam) + '_' + str(i))
     #     plt.show()
 
@@ -225,9 +229,9 @@ def create_polynomial_regression_model(degree, xs, ys):
 
 class LineFitter:
 
-    def __init__(self, method='scipy', plot=False):
+    def __init__(self, method='scipy', plot=True):
         self.method = method
-        self.plot = False
+        self.plot = True
 
     def fitLine(self, image, i, cam, cont):
 

@@ -1,16 +1,7 @@
-import plotly
-
 from ctr.reader.reader import Reader
-from ctr.resources import *
 from ctr.segmentation import BackgroundSubstraction
-from ctr.reconstruction import LineFitter, WeightedGraph, transform, transform_many, show_robot_3d, join_corresp_coors
+from ctr.reconstruction import *
 import numpy as np
-from scipy.io import savemat
-
-import matplotlib.pyplot as plt
-import plotly.graph_objects as go
-from plotly.subplots import make_subplots
-import plotly.express as px
 
 
 if __name__ == '__main__':
@@ -29,12 +20,17 @@ if __name__ == '__main__':
     cam1_lf = lf.fitLines(cam1imgs, 1, contours_cam1, save_folder=LF_RESULTS_FOLDER)
     cam2_lf = lf.fitLines(cam2imgs, 2, contours_cam2, save_folder=LF_RESULTS_FOLDER)
 
-    good_fits = [5, 6, 7, 8]
+    good_fits = np.arange(4, 19)
     good_coor_sets = {}
 
     for gf in good_fits:
         corresp = [cam1_lf[gf],  cam2_lf[gf]]
         good_coor_sets.update({gf : corresp})
+
+    # good_coor_sets = {}
+    # for k in cam1_lf.keys():
+    #     corresp = [cam1_lf[k], cam2_lf[k]]
+    #     good_coor_sets.update({k : corresp})
 
     wg = WeightedGraph()
     # graph_matches = GRAPH_MATCHES
@@ -51,13 +47,34 @@ if __name__ == '__main__':
         wg.clear()
         print((idx - 4) / len(good_coor_sets.keys()))
 
-    # print(graph_matches.items())
+    print(graph_matches.items())
 
     # rerturns dict of idx : [c1coors, c2coors]
     corresp_coors = join_corresp_coors(good_coor_sets, graph_matches)
 
+    # error = error_function(BEST_TRANSF_X, p1s, p2s, mode='mult')
+    # errs, cam2reflect = get_c2reflection(corresp_coors)
+    # show_reflection(cam2imgs, cam2reflect)
+
     robots = transform_many(corresp_coors)
     show_robot_3d(robots)
+    for c in corresp_coors.keys():
+        coors = corresp_coors.get(c)
+        c2lf = cam2_lf[c]
+        cam1s = [x[0] for x in coors]
+        cam2s = [x[1] for x in coors]
+        if False:
+            show_reflection(cam2imgs[c], cam2s, c)
+
+        err_sum, c2prj = error_function(BEST_TRANSF_X, cam1s, cam2s)
+        print(len(cam1_lf[c]), len(c2lf), len(c2prj))
+        dif = len(cam2s) - len(c2prj)
+        print('dif', dif)
+        show_reflection(cam2imgs[c], c2prj, c)
+
+    for key in robots.keys():
+        name = f'lfscipy3_rob{key}.mat'
+        np.savetxt(name, robots[key])
 
 
 

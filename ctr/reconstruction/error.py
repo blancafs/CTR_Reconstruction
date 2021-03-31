@@ -3,15 +3,112 @@ import cv2
 
 from ctr.resources import *
 
+
 def transform_many(corresp_coors_dict):
     # returns robot coordinate in (x,y,z) format
     robots = {}
     for i in corresp_coors_dict.keys():
         coors = corresp_coors_dict.get(i)
-        print(coors)
         real_points = transform(coors)
         robots.update({i: real_points})
     return robots
+
+# def get_c2reflection(corresp_coors, mode='mult'):
+#     # where corresp_coors is in format: c1 [(x,y),(x',y')] c2
+#     Tr = BEST_TRANSF_X
+#
+#     errors = {}
+#     cam2_final = {}
+#     for x in corresp_coors.keys():
+#         err_sum = 0
+#         cam2_coors = []
+#         elem = corresp_coors.get(x)
+#         for i, pair in enumerate(elem):
+#             cam1 = elem[i][0]
+#             cam2 = elem[i][1]
+#
+#             # Put coordinates in 2xn shape
+#             c1 = np.array(cam1).T
+#             c2 = np.array(cam2).T
+#
+#             # Setting intrinsic matrix
+#             c2_int = np.array([[816.5455, 0, 0], [0, 816.7107, 0], [324.5504, 237.2101, 1]])
+#             c2_int = np.transpose(c2_int)
+#             c2_int = np.c_[c2_int, np.zeros(3)]
+#             # print(c2_int)
+#
+#             # Params to optimise, using them for the extrinsic matrix
+#             augm = np.array([[0, 0, 0, 1]])
+#             c2_ex = np.reshape(Tr, (3, 4))
+#             c2_ex = np.concatenate((c2_ex, augm), axis=0)
+#             # print(c2_ex) reconstruction of the extrinsic matrix correct
+#
+#             augm0 = np.array([[0], [0], [0]])
+#             c1_ex = np.concatenate((np.identity(3), augm0), axis=1)
+#             c1_ex = np.concatenate((c1_ex, augm), axis=0)
+#
+#             # projections for camera 1 and camera 2 coordinates -> 3D
+#             proj1 = cv2.UMat(np.dot(c2_int, c1_ex))
+#             pj1 = cv2.UMat.get(proj1)
+#             proj2 = cv2.UMat(np.dot(c2_int, c2_ex))
+#             pj2 = cv2.UMat.get(proj2)
+#
+#             proj_points1 = cv2.UMat(c1)
+#             proj_points2 = cv2.UMat(c2)
+#
+#             # 4D real world points
+#             # print('triangulating...')
+#             points = cv2.triangulatePoints(proj1, proj2, proj_points1, proj_points2)
+#
+#             # 4x n where [0] = x, 1=y, 2=z, 3=homterm
+#             world_coors = cv2.UMat.get(points)
+#             a = zip(world_coors[0], world_coors[1], world_coors[2], world_coors[3])
+#             threed_non_hom_points = list(a)
+#
+#             threed_hom_points = []
+#             # Makes 4d into 3d points
+#             for p in threed_non_hom_points:
+#                 xc = p[0]
+#                 y = p[1]
+#                 z = p[2]
+#                 aug = p[3]
+#                 if aug == 0:
+#                     print(p)
+#                     print('dividing by 0...')
+#                 newp = np.array([xc / aug, y / aug, z / aug, 1])
+#                 threed_hom_points.append(newp)
+#
+#
+#
+#             proj2_np = cv2.UMat.get(proj2)
+#
+#             if mode == 'mult':
+#                 # Find dif (ED) between projected point and world point by reprojecting back to image 2
+#                 for i, td in enumerate(threed_hom_points):
+#                     # curr_td = np.array(td).reshape((4, 1))
+#                     projection = np.dot(proj2_np, td)
+#                     prj_i2 = projection / projection[2]
+#                     prj_i2 = np.array([prj_i2[0], prj_i2[1]])
+#                     cam2point = np.array([c2[0][i], c2[1][i]])
+#                     cam2_coors.append(prj_i2)
+#                     err = np.linalg.norm(prj_i2 - cam2point)
+#                     err_sum += err
+#
+#             if mode == 'single':
+#                 # Find dif (ED) between projected point and world point by reprojecting back to image 2
+#                 for i, td in enumerate(threed_hom_points):
+#                     projection = np.dot(proj2_np, td)
+#                     prj_i2 = projection / projection[2]
+#                     prj_i2 = np.array([prj_i2[0], prj_i2[1]])
+#                     cam2point = np.array([c2[0], c2[1]])
+#                     cam2_coors.append(prj_i2)
+#                     err = np.linalg.norm(prj_i2 - cam2point)
+#                     err_sum += err
+#
+#         errors.update({x: err_sum})
+#         cam2_final.update({x: cam2_coors})
+#
+#     return err_sum, cam2_final
 
 def transform(corresp_coors):
     # where corresp_coors is in format: c1 [(x,y),(x',y')] c2
@@ -71,7 +168,7 @@ def transform(corresp_coors):
     return final_points
 
 
-def error_function(x, arg1, arg2, mode='single'):
+def error_function(x, arg1, arg2, mode='mult'):
     """
     Applies transformation to coordinates, reflects them back to find the error.
     Takes as argument:
@@ -136,6 +233,7 @@ def error_function(x, arg1, arg2, mode='single'):
             threed_hom_points.append(newp)
 
     err_sum = 0
+    prj2_points = []
 
     if mode == 'mult':
         # Find dif (ED) between projected point and world point by reprojecting back to image 2
@@ -144,10 +242,10 @@ def error_function(x, arg1, arg2, mode='single'):
             projection = np.dot(proj2_np, td)
             prj_i2 = projection / projection[2]
             prj_i2 = np.array([prj_i2[0], prj_i2[1]])
-            print(c2[0])
             cam2point = np.array([c2[0][i], c2[1][i]])
             err = np.linalg.norm(prj_i2 - cam2point)
             err_sum += err
+            prj2_points.append(prj_i2)
     if mode == 'single':
         # Find dif (ED) between projected point and world point by reprojecting back to image 2
         for i, td in enumerate(threed_hom_points):
@@ -158,8 +256,9 @@ def error_function(x, arg1, arg2, mode='single'):
             cam2point = np.array([c2[0], c2[1]])
             err = np.linalg.norm(prj_i2 - cam2point)
             err_sum += err
+            prj2_points.append(prj_i2)
 
-    return err_sum
+    return err_sum, prj2_points
 
 
 def objective_func(*args):
