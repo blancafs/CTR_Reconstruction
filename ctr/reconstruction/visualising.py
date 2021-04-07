@@ -19,6 +19,8 @@ def show_robot_3d(coors_dict):
 
 
 def show_reflection(image, c2coors, c):
+    print('showing reflection .. ')
+    print(c2coors.shape)
     # coors in format [i:[x, y, z]...]
     xs = [x[0] for x in c2coors]
     ys = [x[1] for x in c2coors]

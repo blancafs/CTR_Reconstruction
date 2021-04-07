@@ -20,7 +20,10 @@ if __name__ == '__main__':
     cam1_lf = lf.fitLines(cam1imgs, 1, contours_cam1, save_folder=LF_RESULTS_FOLDER)
     cam2_lf = lf.fitLines(cam2imgs, 2, contours_cam2, save_folder=LF_RESULTS_FOLDER)
 
-    good_fits = np.arange(4, 19)
+    print(len(cam1_lf[5]), len(cam2_lf[5]))
+
+    good_fits = [5]
+        # np.arange(4, 19)
     good_coor_sets = {}
 
     for gf in good_fits:
@@ -47,7 +50,7 @@ if __name__ == '__main__':
         wg.clear()
         print((idx - 4) / len(good_coor_sets.keys()))
 
-    print(graph_matches.items())
+    # print(graph_matches.items())
 
     # rerturns dict of idx : [c1coors, c2coors]
     corresp_coors = join_corresp_coors(good_coor_sets, graph_matches)
@@ -56,25 +59,22 @@ if __name__ == '__main__':
     # errs, cam2reflect = get_c2reflection(corresp_coors)
     # show_reflection(cam2imgs, cam2reflect)
 
-    robots = transform_many(corresp_coors)
-    show_robot_3d(robots)
+    # robots = transform_many(corresp_coors)
+    # show_robot_3d(robots)
     for c in corresp_coors.keys():
+        print('in loop...')
         coors = corresp_coors.get(c)
         c2lf = cam2_lf[c]
         cam1s = [x[0] for x in coors]
         cam2s = [x[1] for x in coors]
-        if False:
-            show_reflection(cam2imgs[c], cam2s, c)
 
         err_sum, c2prj = error_function(BEST_TRANSF_X, cam1s, cam2s)
-        print(len(cam1_lf[c]), len(c2lf), len(c2prj))
-        dif = len(cam2s) - len(c2prj)
-        print('dif', dif)
+        print(c2prj)
         show_reflection(cam2imgs[c], c2prj, c)
-
-    for key in robots.keys():
-        name = f'lfscipy3_rob{key}.mat'
-        np.savetxt(name, robots[key])
-
-
-
+    # #
+    # # for key in robots.keys():
+    # #     name = f'lfscipy3_rob{key}.mat'
+    # #     np.savetxt(name, robots[key])
+    #
+    #
+    #

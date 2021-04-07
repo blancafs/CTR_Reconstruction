@@ -14,6 +14,8 @@ from scipy.optimize import curve_fit
 from matplotlib import pyplot
 from scipy.interpolate import UnivariateSpline, interp1d, CubicSpline
 from scipy import interpolate
+from sklearn.linear_model import HuberRegressor
+from sklearn.preprocessing import StandardScaler
 
 
 # given contour shapes from backsubtract class, define polynomials going neatly through points in order
@@ -141,95 +143,51 @@ def fitCurve(img, xs, ys, i, cam, plot=False):
     popt, _ = curve_fit(objective, xs, ys)
     a, b, c, d = popt
 
-    x_line = line_range(min(xs), max(xs), 500)
+    x_line = line_range(min(xs), max(xs), 100)
+    # , 500
     y_line = objective(x_line, a, b, c, d)
+
     # if plot:
     #     plt.scatter(xs, ys)
     #     plt.plot(x_line, y_line, '--', color='red')
     #     plt.imshow(img)
     #     plt.title(str(cam) + '_' + str(i))
+    #     name = str(cam) + str(i) + '.png'
+    #     plt.savefig(name)
     #     plt.show()
 
     return x_line, y_line
 
 
-def polyFitting(img_idx, cam, xs, ys, deg):
-    xs = xs.reshape((len(xs), 1))
-    ys = ys.reshape((len(ys), 1))
-
-    df = pd.DataFrame(columns=['Cam', 'Image_idx', 'degree', 'RMSE', 'R2'])
-
-    polynomial_features = PolynomialFeatures(degree=deg)
-    x_poly = polynomial_features.fit_transform(xs)
-
-    model = LinearRegression()
-    model.fit(x_poly, ys)
-    y_poly_pred = model.predict(x_poly)
-
-    rmse = np.sqrt(mean_squared_error(ys, y_poly_pred))
-    r2 = r2_score(ys, y_poly_pred)
-
-    # df_entry = [cam, img_idx, deg, rmse, r2]
-    # df.loc[len(df)] = df_entry
-    #
-    # # plt.show()
-    # print("Saving to csv file for cam", str(cam), "...")
-    # filename = "C:\\Users\\Blanca\\Documents\\CTRTracking\\threed_reconstruct\\poly_results.csv"
-    # with open(filename, 'a') as f:
-    #     df.to_csv(f, header=f.tell() == 0, index=False)
-
-    #    return the coordinates for the polynomial fit
-
-    # print('xpoly shape', xs.shape)
-    # print('y_poly_pred shape', y_poly_pred.shape)
-    return xs, y_poly_pred
-
-
-def create_polynomial_regression_model(degree, xs, ys):
+def huber_fit(i, img, xs, ys):
     "Creates a polynomial regression model for the given degree"
+    x_scaler, y_scaler = StandardScaler(), StandardScaler()
+    x_train = x_scaler.fit_transform(xs[..., None])
+    y_train = y_scaler.fit_transform(ys[..., None])
 
-    xs = xs.reshape((len(xs), 1))
-    ys = ys.reshape((len(ys), 1))
+    model = HuberRegressor(epsilon=1)
+    model.fit(x_train, y_train.ravel())
+    test_x = line_range(min(xs), max(xs), 500)
 
-    poly_features = PolynomialFeatures(degree=degree)
+    predictions = y_scaler.inverse_transform(
+        model.predict(x_scaler.transform(test_x[..., None]))
+    )
 
-    # transforms the existing features to higher degree features.
-    X_train_poly = poly_features.fit_transform(xs)
+    plt.scatter(xs, ys)
+    plt.plot(test_x, predictions, '--', color='red')
+    plt.imshow(img)
+    plt.title(str(i))
+    # name = str(cam) + str(i) + '.png'
+    # plt.savefig(name)
+    plt.show()
 
-    # fit the transformed features to Linear Regression
-    poly_model = LinearRegression()
-    poly_model.fit(X_train_poly, ys)
+    return test_x, predictions
 
-    # predicting on training data-set
-    y_train_predicted = poly_model.predict(X_train_poly)
-
-    # predicting on test data-set
-    y_test_predict = poly_model.predict(poly_features.fit_transform(xs))
-
-    # evaluating the model on training dataset
-    rmse_train = np.sqrt(mean_squared_error(ys, y_train_predicted))
-    r2_train = r2_score(ys, y_train_predicted)
-
-    # evaluating the model on test dataset
-    rmse_test = np.sqrt(mean_squared_error(ys, y_test_predict))
-    r2_test = r2_score(ys, y_test_predict)
-
-    print("The model performance for the training set")
-    print("-------------------------------------------")
-    print("RMSE of training set is {}".format(rmse_train))
-    print("R2 score of training set is {}".format(r2_train))
-
-    print("\n")
-
-    print("The model performance for the test set")
-    print("-------------------------------------------")
-    print("RMSE of test set is {}".format(rmse_test))
-    print("R2 score of test set is {}".format(r2_test))
 
 
 class LineFitter:
 
-    def __init__(self, method='scipy', plot=True):
+    def __init__(self, method='none', plot=True):
         self.method = method
         self.plot = True
 
@@ -244,9 +202,13 @@ class LineFitter:
             xs, ys = fitCurve(image, xs, ys, i, cam, self.plot)
             return xs, ys
 
-        if self.method == 'polyreg':
+        if self.method == 'huberfit':
             [xs, ys] = concatContCoors(cont)
-            xs, ys = polyFitting(i, cam, xs, ys, 5)
+            huber_fit(i, image, xs, ys)
+            return xs, ys
+
+        if self.method == 'none':
+            [xs, ys] = concatContCoors(cont)
             return xs, ys
 
     def fitLines(self, images: list, cam: int, contours: dict, save_folder=""):
