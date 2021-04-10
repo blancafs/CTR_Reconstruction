@@ -1,2 +1,0 @@
-matlab 3d curves for 3d plot data
-minimise error in 3d with better line fitting

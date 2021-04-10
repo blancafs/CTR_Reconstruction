@@ -1,35 +1,20 @@
 import collections
 
 import cv2
-import os
-import pandas as pd
 import numpy as np
 from scipy.optimize import curve_fit
 import matplotlib.pyplot as plt
-import math
-from sklearn.linear_model import LinearRegression
 from sklearn.metrics import mean_squared_error, r2_score
-from sklearn.preprocessing import PolynomialFeatures
 from scipy.optimize import curve_fit
-from matplotlib import pyplot
-from scipy.interpolate import UnivariateSpline, interp1d, CubicSpline
-from scipy import interpolate
-from sklearn.linear_model import HuberRegressor
 from sklearn.preprocessing import StandardScaler
+from sklearn.linear_model import (
+    LinearRegression, TheilSenRegressor, RANSACRegressor, HuberRegressor)
+from sklearn.preprocessing import PolynomialFeatures
+from sklearn.pipeline import make_pipeline
 
 
 # given contour shapes from backsubtract class, define polynomials going neatly through points in order
 # to better represent the robot and have a better shot at matching correspondance.
-
-def fitPolyToContours(contour):
-    contlines = []
-
-    for c in contour:
-        approx = cv2.approxPolyDP(c, 0.009 * cv2.arcLength(c, False), 3, True)
-        contlines.append(approx)
-
-    return contlines
-
 
 def showFittedLine(image, i, approxpoly):
     # draws boundary of contours to check resultssss
@@ -62,88 +47,19 @@ def concatContCoors(contours):
     return [finalxs, finalys]
 
 
-def ransac(pts_x, pts_y, n_iter=10, dist_thresh=15):
-    best_m = 0
-    best_c = 0
-    best_count = 0
-
-    # set up figure and ax
-    fig, ax = plt.subplots(figsize=(8, 8))
-    ax.scatter(pts_x, pts_y, c='blue')
-
-    plt.ion()
-
-    for i in range(n_iter):
-
-        print("iteration: ", str(i))
-        random_x1 = 0
-        random_y1 = 0
-        random_x2 = 0
-        random_y2 = 0
-
-        # select two unique points
-        while (random_x1 == random_x2) or (random_y1 == random_y2):
-            index1 = np.random.choice(pts_x.shape[0])
-            index2 = np.random.choice(pts_x.shape[0])
-            random_x1 = pts_x[index1]
-            random_y1 = pts_y[index1]
-            random_x2 = pts_x[index2]
-            random_y2 = pts_y[index2]
-
-        print("random point 1: ", random_x1, random_y1)
-        print("random point 2: ", random_x2, random_y2)
-
-        # slope and intercept for the 2 points
-        if (random_x2 - random_x1 == 0) and (random_y2 - random_y1 != 0):
-            continue
-        m = (random_y2 - random_y1) / (random_x2 - random_x1)
-        c = random_y1 - m * random_x1
-        count = 0
-        for i, value in enumerate(pts_x):
-
-            # calculate perpendicular distance between sample line and input data points
-            dist = abs(-m * pts_x[i] + pts_y[i] - c) / math.sqrt(m ** 2 + 1)
-
-            # count the number of inliers
-            if dist < dist_thresh:
-                count = count + 1
-
-        print("Number of inliers: ", count)
-
-        # best line has the maximum number of inliers
-        if count > best_count:
-            best_count = count
-            best_m = m
-            best_c = c
-
-        ax.scatter([random_x1, random_x2], [random_y1, random_y2], c='red')
-
-        # draw line between points
-        line = ax.plot([0, 1000], [c, m * 1000 + c], 'red')
-        plt.draw()
-        plt.pause(1)
-        line.pop(0).remove()
-        ax.scatter([random_x1, random_x2], [random_y1, random_y2], c='blue')
-
-    print("best_line: y = {1:.2f} x + {1:.2f}".format(m, c))
-
-    ax.plot([0, 1000], [best_c, best_m * 1000 + best_c], 'green')
-    plt.ioff()
-    plt.show()
-
 def line_range(start, stop, count):
     step = (stop - start) / float(count)
     return np.array([start + i * step for i in range(count)])
 
-def fitCurve(img, xs, ys, i, cam, plot=False):
 
+def fitCurve(img, xs, ys, i, cam, plot=False):
     def objective(x, a, b, c, d):
-        return a * x + b * x ** 2 + c * x**3 + d
+        return a * x + b * x ** 2 + c * x ** 3 + d
 
     popt, _ = curve_fit(objective, xs, ys)
     a, b, c, d = popt
 
-    x_line = line_range(min(xs), max(xs), 100)
+    x_line = line_range(min(xs), max(xs), 500)
     # , 500
     y_line = objective(x_line, a, b, c, d)
 
@@ -184,18 +100,64 @@ def huber_fit(i, img, xs, ys):
     return test_x, predictions
 
 
+def clean_conts(xs, ys):
+    coors = list(zip(xs, ys))
+    coors = [list(a) for a in coors]
+    nodobs = list(set(coors))
+    sort = sorted(nodobs, key=lambda x: x[0])
+    xs = [x[0] for x in sort]
+    ys = [x[1] for x in sort]
+
+    return xs, ys
+
+
+def ransac(i, cam, img, xs, ys):
+    np.random.seed(42)
+    xs = xs[:, np.newaxis]
+
+    x_test = line_range(min(xs), max(xs), 100)
+
+    methods1 = {4: 'o', 5: 'o', 6: 'o', 7: 'o', 8: 'o', 9: 'o', 10: 'o', 11: 'r', 12: 'o', 13: 'o', 14: 'o', 15: 'o',
+                16: 'o', 17: 'o', 18: 'o'}
+    methods2 = {4: 'o', 5: 'o', 6: 'o', 7: 'o', 8: 'o', 9: 'o', 10: 'o', 11: 'r', 12: 'o', 13: 'o', 14: 'o', 15: 'r',
+                16: 'o', 17: 'r', 18: 'o'}
+
+    if cam == 1:
+        met = methods1.get(i)
+    if cam == 2:
+        met = methods2.get(i)
+
+    if met == 'o':
+        estimator = LinearRegression()
+    else:
+        estimator = RANSACRegressor()
+
+    model = make_pipeline(PolynomialFeatures(3), estimator)
+    model.fit(xs, ys)
+    y_plot = model.predict(x_test)
+    # plt.plot(x_test, y_plot)
+    # plt.imshow(img)
+    # name = 'cam'+ str(cam) + '_' + str(i) + '.png'
+    # plt.savefig(name)
+    #
+    #
+    # plt.show()
+
+    return x_test, y_plot
+
 
 class LineFitter:
 
-    def __init__(self, method='none', plot=True):
+    def __init__(self, method='ransac', plot=True):
         self.method = method
-        self.plot = True
+        self.plot = plot
 
     def fitLine(self, image, i, cam, cont):
 
-        if self.method == 'fitpoly':
-            contlines = fitPolyToContours(cont)
-            showFittedLine(image, i, contlines)
+        if self.method == 'ransac':
+            [xs, ys] = concatContCoors(cont)
+            xs, ys = ransac(i, cam, image, xs, ys)
+            return xs, ys
 
         if self.method == 'scipy':
             [xs, ys] = concatContCoors(cont)
@@ -209,6 +171,8 @@ class LineFitter:
 
         if self.method == 'none':
             [xs, ys] = concatContCoors(cont)
+            [xs, ys] = clean_conts(xs, ys)
+            print('xs', xs, 'ys', ys)
             return xs, ys
 
     def fitLines(self, images: list, cam: int, contours: dict, save_folder=""):
@@ -225,58 +189,3 @@ class LineFitter:
                 fitted_lines.update({i: zipped})
 
         return fitted_lines
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-# ===================================================================================================================================================================
-# zipped = list(zip(xs, ys))
-#     ordered_x = sorted(zipped, key=lambda x: x[0])
-#     final = []
-#     seen_xs = []
-#     for xy in ordered_x:
-#         x = xy[0]
-#         if x not in seen_xs:
-#             final.append(xy)
-#             seen_xs.append(x)
-#
-#     new_xs = np.array([x[0] for x in final])
-#     new_ys = np.array([x[1] for x in final])
-#
-#     # s determines how close to the data you have to go through
-#     # s = interpolate.splrep(xs, ys, s=3, method)
-#     cs = CubicSpline(new_xs, new_ys)
-#     x_line = np.arange(min(xs), max(xs), 1)
-#     y_line = cs(x_line)
-#     # print(x_line, y_line)
-#     spl = interpolate.splrep(new_xs, new_ys, s=5)
-#     y_in_line = interpolate.splev(x_line, spl)
-#
-#     plt.scatter(xs, ys, label='true data')
-#     plt.plot(x_line, y_in_line, color='black', label='interpolation')
-#     # plt.plot(x_line, y_line, '--', color='red', label='cubic spline')
-#     plt.title(str(cam) + '_' + str(i))
-#     plt.legend()
-#     plt.show()
-
-# df = pd.DataFrame({'coors': zipped}, index=list(range(len(xs))), dtype=np.float32)
-                #
-                # filename = 'scipy_curve_cam' + str(cam) + '_' + str(i) +".csv"
-
-                # if len(save_folder) > 0:
-                #     save_path = os.path.join(save_folder, filename)
-                #     with open(save_path, 'a') as f:
-                #         df.to_csv(f, header=f.tell() == 0, index=False)
-                #     message = True

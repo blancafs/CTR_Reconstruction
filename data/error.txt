@@ -1,7 +1,0 @@
-total euclidian distance error
-reflect bck and see error
-transformation error
-show opt minimises errors
-show projected vs 2d
-show 3d with equal axes
-include first project stuff

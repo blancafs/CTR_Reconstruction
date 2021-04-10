@@ -1,7 +1,7 @@
 from ctr.common.common import CtrClass
 from ctr.resources import *
 from ctr.reconstruction.error import error_function
-
+import math
 import numpy as np
 from scipy.optimize import linear_sum_assignment
 

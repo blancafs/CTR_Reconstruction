@@ -7,7 +7,7 @@ def show_robot_3d(coors_dict):
         xs = [x[0] for x in r]
         ys = [x[1] for x in r]
         zs = [x[2] for x in r]
-        print('[SHOWROBOT3D]:showing figure...')
+        # print('[SHOWROBOT3D]:showing figure...')
         fig = plt.figure(figsize=(10, 10))
         ax = plt.axes(projection='3d')
         ax.plot3D(xs, ys, zs, 'gray')
@@ -20,7 +20,6 @@ def show_robot_3d(coors_dict):
 
 def show_reflection(image, c2coors, c):
     print('showing reflection .. ')
-    print(c2coors.shape)
     # coors in format [i:[x, y, z]...]
     xs = [x[0] for x in c2coors]
     ys = [x[1] for x in c2coors]
