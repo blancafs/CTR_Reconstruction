@@ -27,7 +27,7 @@ def show_reflection(image, c2coors, c):
     plt.scatter(xs, ys)
     plt.imshow(image)
 
-    title='cam2_'+str(c)+'.png'
+    title='cam2_reflect'+str(c)+'.png'
     plt.title(title)
     plt.savefig(title)
     plt.show()

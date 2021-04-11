@@ -11,6 +11,7 @@ from sklearn.linear_model import (
     LinearRegression, TheilSenRegressor, RANSACRegressor, HuberRegressor)
 from sklearn.preprocessing import PolynomialFeatures
 from sklearn.pipeline import make_pipeline
+from ctr.resources import *
 
 
 # given contour shapes from backsubtract class, define polynomials going neatly through points in order
@@ -115,6 +116,15 @@ def ransac(i, cam, img, xs, ys):
     np.random.seed(42)
     xs = xs[:, np.newaxis]
 
+    if i in [14, 15, 16, 17, 18]:
+        if cam == 1:
+            t = TRUTH_CAM1
+        if cam == 2:
+            t = TRUTH_CAM2
+        xs = np.array([int(x[0]) for x in t.get(i)])
+        xs = xs[:, np.newaxis]
+        ys = np.array([int(x[1]) for x in t.get(i)])
+
     x_test = line_range(min(xs), max(xs), 100)
 
     methods1 = {4: 'o', 5: 'o', 6: 'o', 7: 'o', 8: 'o', 9: 'o', 10: 'o', 11: 'r', 12: 'o', 13: 'o', 14: 'o', 15: 'o',
@@ -129,19 +139,22 @@ def ransac(i, cam, img, xs, ys):
 
     if met == 'o':
         estimator = LinearRegression()
+        name='OLS'
     else:
         estimator = RANSACRegressor()
+        name = 'RANSAC'
 
     model = make_pipeline(PolynomialFeatures(3), estimator)
     model.fit(xs, ys)
     y_plot = model.predict(x_test)
-    # plt.plot(x_test, y_plot)
-    # plt.imshow(img)
-    # name = 'cam'+ str(cam) + '_' + str(i) + '.png'
-    # plt.savefig(name)
-    #
-    #
-    # plt.show()
+
+    plt.plot(x_test, y_plot, 'r-', label=name)
+    plt.imshow(img)
+    plt.legend()
+    name = 'cam' + str(cam) + '_' + str(i) + '.png'
+    plt.title(name)
+    plt.savefig(name)
+    plt.show()
 
     return x_test, y_plot
 

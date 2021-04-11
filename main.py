@@ -13,22 +13,13 @@ if __name__ == '__main__':
 
     # Apply segmentation from part 1 to each set
     segmentor = BackgroundSubstraction()
-    start = time.time()
     contours_cam1 = segmentor.segmentImgs(cam1imgs, backimg)
     contours_cam2 = segmentor.segmentImgs(cam2imgs, backimg)
-    end = time.time()
-    segmentation_time = end - start
 
     # Fit polynomials to robot body in order to minimise points to transform, save to csvs
     lf = LineFitter()
-    start = time.time()
-
-    # cam1_lf = TRUTH_CAM1
-    # cam2_lf = TRUTH_CAM2
     cam1_lf = lf.fitLines(cam1imgs, 1, contours_cam1, save_folder=LF_RESULTS_FOLDER)
     cam2_lf = lf.fitLines(cam2imgs, 2, contours_cam2, save_folder=LF_RESULTS_FOLDER)
-    # end = time.time()
-    # curve_fit_time = end - start
 
     good_fits = np.arange(4, 18)
 
@@ -41,7 +32,6 @@ if __name__ == '__main__':
     # graph_matches = GRAPH_MATCHES
     graph_matches = {}
     print('Applying weighted graph...')
-    start = time.time()
     # Apply weighted graph matching to sets of coordinates
     for idx in good_coor_sets.keys():
         c1 = good_coor_sets.get(idx)[0]
@@ -52,10 +42,8 @@ if __name__ == '__main__':
         graph_matches.update({idx: matching})
         wg.clear()
         print((idx-4) / len(good_coor_sets.keys()))
-    end = time.time()
-    graph_time = end - start
 
-    # # SAVING GRAPH MATCHES (for truth data)
+    # SAVING GRAPH MATCHES (for truth data)
     # a_file = open("test/truth_matches_contours.pkl", "wb")
     # pickle.dump(graph_matches, a_file)
     # a_file.close()
@@ -63,29 +51,26 @@ if __name__ == '__main__':
     # returns dict of idx : [c1coors, c2coors]
     corresp_coors = join_corresp_coors(good_coor_sets, graph_matches)
 
-    start = time.time()
     # TRANSFORM CORRESPONDING COORDINATES
     robots = transform_many(corresp_coors)
-    end = time.time()
-    transform_time = end - start
 
     print('showing robot...')
     show_robot_3d(robots)
 
     # SHOW REFLECTION ERROR
-    # for c in corresp_coors.keys():
-    #     coors = corresp_coors.get(c)
-    #     c2lf = cam2_lf[c]
-    #     cam1s = [x[0] for x in coors]
-    #     cam2s = [x[1] for x in coors]
-    #
-    #     err_sum, c2prj = error_function(BEST_TRANSF_X, cam1s, cam2s)
-    #     print('Image ', str(c), ' had error:', str(err_sum))
-        # show_reflection(cam2imgs[c], c2prj, c)
+    for c in corresp_coors.keys():
+        coors = corresp_coors.get(c)
+        c2lf = cam2_lf[c]
+        cam1s = [x[0] for x in coors]
+        cam2s = [x[1] for x in coors]
 
-    # # SAVE 3D COORDINATES OF ROBOT
+        err_sum, c2prj = error_function(BEST_TRANSF_X, cam1s, cam2s)
+        print('Image ', str(c), ' had error:', str(err_sum))
+        show_reflection(cam2imgs[c], c2prj, c)
+
+    # SAVE 3D COORDINATES OF ROBOT
     # for key in robots.keys():
-    #     name = f'truth_rob{key}.mat'
+    #     name = f'final_rob{key}.mat'
     #     np.savetxt(name, robots[key])
 
     # print('Segmentation time: ', segmentation_time)
